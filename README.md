@@ -1,98 +1,129 @@
-# api_app_directory
+# API App Directory
 
-# Тестовое задание: Создание REST API приложения для справочника Организаций, Зданий и Деятельности
+REST API сервис для управления справочником организаций, зданий и видов деятельности.
 
-## Цели:
-1. Спроектировать базу данных, реализовать миграции и заполнить её тестовыми данными.
-2. Разработать REST API с использованием FastAPI, Pydantic, SQLAlchemy и Alembic.
-3. Упаковать приложение в Docker-контейнер.
-4. Добавить документацию API через Swagger UI или Redoc.
+## Стек технологий
 
-## Требования к проекту:
+- FastAPI
+- SQLAlchemy + Alembic
+- PostgreSQL
+- Docker & Docker Compose
+- Pydantic
 
-### 1. База данных
-- **Организация**:
-  - Поля: `id`, `name` (название), `phone_numbers` (список номеров телефонов), `building_id` (внешний ключ на таблицу зданий), `activities` (многие ко многим связь с таблицей деятельностей).
-- **Здание**:
-  - Поля: `id`, `address` (адрес), `latitude` (широта), `longitude` (долгота).
-- **Деятельность**:
-  - Поля: `id`, `name` (название), `parent_id` (внешний ключ для древовидной структуры, ограничение вложенности до 3 уровней).
+## Быстрый старт
 
-### 2. Функционал API
-Реализовать следующие методы:
-1. **Список всех организаций в конкретном здании**:
-   - Метод: GET `/buildings/{building_id}/organizations`
-   - Ответ: JSON-массив организаций.
-2. **Список всех организаций по виду деятельности**:
-   - Метод: GET `/activities/{activity_id}/organizations`
-   - Ответ: JSON-массив организаций.
-3. **Поиск организаций в радиусе/прямоугольной области относительно точки на карте**:
-   - Метод: GET `/organizations/search`
-   - Параметры: `latitude`, `longitude`, `radius` (или `min_lat`, `max_lat`, `min_lon`, `max_lon`).
-   - Ответ: JSON-массив организаций.
-4. **Информация об организации по ID**:
-   - Метод: GET `/organizations/{organization_id}`
-   - Ответ: JSON-объект с данными организации.
-5. **Поиск организаций по родительской деятельности**:
-   - Метод: GET `/activities/search`
-   - Параметры: `activity_name`.
-   - Ответ: JSON-массив организаций, связанных с указанной деятельностью и её дочерними элементами.
-6. **Поиск организаций по названию**:
-   - Метод: GET `/organizations/search`
-   - Параметры: `name`.
-   - Ответ: JSON-массив организаций.
+### Запуск через Docker
 
-### 3. Безопасность
-- Все запросы должны использовать статический API-ключ, передаваемый в заголовке `X-API-Key`.
+```bash
+git clone <repository-url>
+cd api_app_directory
+cp .env.example .env  # Настройте переменные окружения
+docker-compose up --build
+```
 
-### 4. Документация
-- Добавить автоматическую документацию через Swagger UI или Redoc.
+API будет доступен по адресу: http://localhost:8000
+Swagger UI: http://localhost:8000/docs
 
-### 5. Docker
-- Создать Dockerfile и docker-compose.yml для запуска приложения и базы данных (PostgreSQL).
-- Написать инструкцию по разворачиванию проекта.
+## API Endpoints
 
-## Инструкции для GitHub Copilot:
-1. Используй современные практики разработки Python:
-   - Структурируй проект: `app/`, `migrations/`, `tests/`, `docker/`.
-   - Используй модульность: разделение на роуты, модели, сервисы.
-   - Пиши чистый, понятный код с комментариями.
-2. Реализуй все методы API с учётом требований.
-3. Добавь проверку входных данных через Pydantic.
-4. Используй SQLAlchemy для работы с базой данных.
-5. Напиши миграции через Alembic.
-6. Добавь тестовые данные и скрипт для их загрузки.
-7. Упакуй приложение в Docker-контейнер.
-8. Добавь документацию API через Swagger UI.
+### Организации
+- `GET /organizations` - список организаций
+- `GET /organizations/{id}` - детали организации
+- `GET /organizations/search` - поиск организаций
+  - По названию: `?name=текст`
+  - По координатам: `?latitude=X&longitude=Y&radius=Z`
+- `POST /organizations` - создание организации
 
-## Пример структуры проекта:
+### Здания
+- `GET /buildings` - список зданий
+- `GET /buildings/{id}` - детали здания
+- `GET /buildings/{id}/organizations` - организации в здании
+- `POST /buildings` - создание здания
 
-project/
+### Виды деятельности
+- `GET /activities` - список видов деятельности
+- `GET /activities/{id}` - детали вида деятельности
+- `GET /activities/search?activity_name=name` - поиск по деятельности
+- `POST /activities` - создание вида деятельности
+
+## Аутентификация
+
+Все запросы требуют заголовок `X-API-Key`:
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8000/organizations
+```
+
+## Локальная разработка
+
+1. Создание виртуального окружения:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+```
+
+2. Установка зависимостей:
+```bash
+pip install -r requirements.txt
+```
+
+3. Настройка базы данных:
+```bash
+# Создание БД
+psql -U postgres -c "CREATE DATABASE app_db"
+
+# Применение миграций
+alembic upgrade head
+```
+
+4. Запуск сервера разработки:
+```bash
+uvicorn app.main:app --reload
+```
+
+## Структура проекта
+
+```
+api_app_directory/
 ├── app/
-│ ├── main.py # Точка входа
-│ ├── models.py # Модели SQLAlchemy
-│ ├── schemas.py # Pydantic схемы
-│ ├── routes/ # Роуты API
-│ │ ├── organizations.py
-│ │ ├── buildings.py
-│ │ └── activities.py
-│ ├── services/ # Бизнес-логика
-│ │ ├── organization_service.py
-│ │ └── activity_service.py
-│ └── database.py # Настройка SQLAlchemy
-├── migrations/ # Alembic миграции
-├── tests/ # Тесты
-├── docker/ # Docker файлы
-│ ├── Dockerfile
-│ └── docker-compose.yml
-└── README.md # Инструкция по разворачиванию
+│   ├── routes/          # API эндпоинты
+│   ├── models.py        # SQLAlchemy модели
+│   ├── schemas.py       # Pydantic схемы
+│   ├── crud.py         # CRUD операции
+│   ├── database.py     # Настройки БД
+│   └── main.py         # Точка входа
+├── alembic/            # Миграции
+├── docker/             # Docker файлы
+└── tests/             # Тесты
+```
 
+## Миграции
 
-## Генерация кода:
-Пожалуйста, помоги мне создать:
-1. Модели SQLAlchemy для таблиц `Organization`, `Building`, `Activity`.
-2. Pydantic схемы для валидации данных.
-3. Роуты API с указанными методами.
-4. Alembic миграции для создания таблиц.
-5. Dockerfile и docker-compose.yml.
-6. Пример тестовых данных и скрипт для их загрузки.
+Создание новой миграции:
+```bash
+alembic revision --autogenerate -m "description"
+```
+
+Применение миграций:
+```bash
+alembic upgrade head
+```
+
+## Тестирование
+
+```bash
+pytest
+```
+
+## Переменные окружения
+
+Необходимые переменные (`.env`):
+- `POSTGRES_USER` - пользователь БД
+- `POSTGRES_PASSWORD` - пароль БД
+- `POSTGRES_DB` - имя БД
+- `DATABASE_URL` - URL подключения к БД
+- `API_KEY` - ключ API для аутентификации
+
+## Лицензия
+
+MIT
