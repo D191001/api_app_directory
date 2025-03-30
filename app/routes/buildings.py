@@ -25,6 +25,19 @@ def read_building(building_id: int, db: Session = Depends(get_db)):
     return building
 
 
+@router.get(
+    "/{building_id}/organizations",
+    response_model=List[schemas.OrganizationWithRelations],
+)
+def read_building_organizations(
+    building_id: int, db: Session = Depends(get_db)
+):
+    building = crud.get_building(db, building_id)
+    if building is None:
+        raise HTTPException(status_code=404, detail="Building not found")
+    return crud.get_organizations_by_building(db, building_id)
+
+
 @router.post("/", response_model=schemas.BuildingWithRelations)
 def create_building(
     building: schemas.BuildingCreate, db: Session = Depends(get_db)

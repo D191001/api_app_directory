@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ActivityBase(BaseModel):
@@ -68,3 +68,11 @@ class OrganizationWithoutActivities(OrganizationBase):
 class OrganizationWithoutBuilding(OrganizationBase):
     id: int
     activities: List[Activity] = []
+
+
+class OrganizationSearch(BaseModel):
+    name: Optional[str] = Field(None, min_length=1)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    radius: Optional[float] = Field(None, gt=0)
+    activity_name: Optional[str] = Field(None, min_length=1)
