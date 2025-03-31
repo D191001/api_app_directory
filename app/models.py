@@ -1,3 +1,7 @@
+from typing import Optional
+
+from geoalchemy2 import Geometry
+from geoalchemy2.shape import to_shape
 from sqlalchemy import Column, Float, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import relationship
 
@@ -48,9 +52,22 @@ class Building(Base):
     __tablename__ = "buildings"
     id = Column(Integer, primary_key=True, index=True)
     address = Column(String, nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
+    location = Column(Geometry('POINT', srid=4326))
     organizations = relationship("Organization", back_populates="building")
+
+    @property
+    def latitude(self) -> Optional[float]:
+        if self.location is None:
+            return None
+        shape = to_shape(self.location)
+        return shape.y
+
+    @property
+    def longitude(self) -> Optional[float]:
+        if self.location is None:
+            return None
+        shape = to_shape(self.location)
+        return shape.x
 
     def to_schema(self):
         from app.schemas import BuildingWithRelations

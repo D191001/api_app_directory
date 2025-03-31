@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class ActivityBase(BaseModel):
@@ -21,16 +21,32 @@ class Activity(ActivityBase):
 
 class BuildingBase(BaseModel):
     address: str
-    latitude: float
-    longitude: float
 
 
-class BuildingCreate(BuildingBase):
-    pass
+class BuildingCreate(BaseModel):
+    address: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
 
 
 class Building(BuildingBase):
     id: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BuildingWithRelations(Building):
+    organizations: List['OrganizationWithoutBuilding'] = []
+
+
+class BuildingWithDistance(BuildingBase):
+    id: int
+    latitude: float
+    longitude: float
+    distance: float  # расстояние в километрах
 
     class Config:
         from_attributes = True
@@ -50,24 +66,29 @@ class ActivityWithRelations(Activity):
     organizations: List['OrganizationWithoutActivities'] = []
 
 
-class BuildingWithRelations(Building):
-    organizations: List['OrganizationWithoutBuilding'] = []
-
-
 class OrganizationWithRelations(OrganizationBase):
     id: int
     activities: List[Activity] = []
     building: Building
+
+    class Config:
+        from_attributes = True
 
 
 class OrganizationWithoutActivities(OrganizationBase):
     id: int
     building: Building
 
+    class Config:
+        from_attributes = True
+
 
 class OrganizationWithoutBuilding(OrganizationBase):
     id: int
     activities: List[Activity] = []
+
+    class Config:
+        from_attributes = True
 
 
 class OrganizationSearch(BaseModel):

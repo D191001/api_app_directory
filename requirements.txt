@@ -6,3 +6,6 @@ alembic
 psycopg2-binary
 pydantic-settings>=2.0.0
 python-dotenv
+GeoAlchemy2==0.13.3
+numpy<2.0.0
+Shapely==2.0.1

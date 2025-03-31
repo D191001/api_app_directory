@@ -13,8 +13,8 @@ router = APIRouter()
 def read_organizations(
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):
-    organizations = crud.get_organizations(db, skip=skip, limit=limit)
-    return organizations
+    """Получение списка всех организаций"""
+    return crud.get_organizations(db, skip=skip, limit=limit)
 
 
 @router.get("/search", response_model=List[schemas.OrganizationWithRelations])
@@ -34,6 +34,12 @@ def search_organizations(
     ),
     db: Session = Depends(get_db),
 ):
+    """
+    Поиск организаций по различным параметрам:
+    - По названию
+    - По координатам в заданном радиусе
+    - По виду деятельности
+    """
     if name:
         return crud.get_organizations_by_name(db, name)
     if all(v is not None for v in [latitude, longitude, radius]):
@@ -52,6 +58,7 @@ def search_organizations(
     "/{organization_id}", response_model=schemas.OrganizationWithRelations
 )
 def read_organization(organization_id: int, db: Session = Depends(get_db)):
+    """Получение информации о конкретной организации"""
     organization = crud.get_organization(db, organization_id)
     if organization is None:
         raise HTTPException(status_code=404, detail="Organization not found")
@@ -62,4 +69,5 @@ def read_organization(organization_id: int, db: Session = Depends(get_db)):
 def create_organization(
     organization: schemas.OrganizationCreate, db: Session = Depends(get_db)
 ):
+    """Создание новой организации"""
     return crud.create_organization(db, organization)

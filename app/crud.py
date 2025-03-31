@@ -1,7 +1,14 @@
 import math
 from typing import List, Optional
 
-from sqlalchemy import or_
+from geoalchemy2.functions import (
+    ST_Distance,
+    ST_DWithin,
+    ST_MakePoint,
+    ST_SetSRID,
+    ST_Transform,
+)
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
 
@@ -40,8 +47,107 @@ def get_building(db: Session, building_id: int):
     )
 
 
+def get_buildings_in_radius(
+    db: Session,
+    latitude: float,
+    longitude: float,
+    radius: float,
+    limit: int = 10,
+) -> List[models.Building]:
+    try:
+        point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
+        radius_meters = radius * 1000
+
+        return (
+            db.query(models.Building)
+            .filter(
+                func.ST_DWithin(
+                    func.Geography(models.Building.location),
+                    func.Geography(point),
+                    radius_meters,
+                )
+            )
+            .order_by(
+                func.ST_Distance(
+                    func.Geography(models.Building.location),
+                    func.Geography(point),
+                )
+            )
+            .limit(limit)
+            .all()
+        )
+    except Exception as e:
+        print(f"Error in get_buildings_in_radius: {e}")
+        return []
+
+
+def get_nearest_buildings(
+    db: Session, latitude: float, longitude: float, limit: int = 5
+) -> List[tuple[models.Building, float]]:
+    try:
+        point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
+
+        query = (
+            db.query(
+                models.Building,
+                func.ST_Distance(
+                    func.Geography(models.Building.location),
+                    func.Geography(point),
+                ).label('distance'),
+            )
+            .order_by('distance')
+            .limit(limit)
+        )
+
+        results = query.all()
+        return [
+            (building, float(distance) / 1000)
+            for building, distance in results
+        ]
+    except Exception as e:
+        print(f"Error in get_nearest_buildings: {e}")
+        return []
+
+
+def get_buildings_in_bounds(
+    db: Session, min_lat: float, max_lat: float, min_lon: float, max_lon: float
+) -> List[models.Building]:
+    try:
+        if min_lat > max_lat or min_lon > max_lon:
+            print("Invalid bounds: min values greater than max values")
+            return []
+
+        bounds_wkt = f'SRID=4326;POLYGON(({min_lon} {min_lat}, {max_lon} {min_lat}, {max_lon} {max_lat}, {min_lon} {max_lat}, {min_lon} {min_lat}))'
+        search_area = func.ST_GeomFromEWKT(bounds_wkt)
+
+        print(
+            f"Searching in bounds: lat [{min_lat}, {max_lat}], lon [{min_lon}, {max_lon}]"
+        )
+
+        buildings = (
+            db.query(models.Building)
+            .filter(func.ST_Within(models.Building.location, search_area))
+            .all()
+        )
+
+        print(f"Found {len(buildings)} buildings")
+        for building in buildings:
+            print(
+                f"Building at: {building.address} ({building.latitude}, {building.longitude})"
+            )
+
+        return buildings
+
+    except Exception as e:
+        print(f"Error in get_buildings_in_bounds: {e}")
+        return []
+
+
 def create_building(db: Session, building: schemas.BuildingCreate):
-    db_building = models.Building(**building.model_dump())
+    location = func.ST_SetSRID(
+        func.ST_MakePoint(building.longitude, building.latitude), 4326
+    )
+    db_building = models.Building(address=building.address, location=location)
     db.add(db_building)
     db.commit()
     db.refresh(db_building)
@@ -79,27 +185,31 @@ def get_organizations_by_building(db: Session, building_id: int):
 def get_organizations_by_coordinates(
     db: Session, latitude: float, longitude: float, radius: float
 ) -> List[models.Organization]:
-    if any(v is None for v in [latitude, longitude, radius]) or radius <= 0:
-        return []
+    try:
+        point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
+        radius_meters = radius * 1000
 
-    # Используем формулу гаверсинусов для поиска в радиусе
-    organizations = (
-        db.query(models.Organization)
-        .join(models.Building)
-        .filter(
-            func.acos(
-                func.sin(func.radians(latitude))
-                * func.sin(func.radians(models.Building.latitude))
-                + func.cos(func.radians(latitude))
-                * func.cos(func.radians(models.Building.latitude))
-                * func.cos(func.radians(models.Building.longitude - longitude))
+        return (
+            db.query(models.Organization)
+            .join(models.Building)
+            .filter(
+                func.ST_DWithin(
+                    func.Geography(models.Building.location),
+                    func.Geography(point),
+                    radius_meters,
+                )
             )
-            * 6371
-            <= radius  # 6371 - радиус Земли в км
+            .order_by(
+                func.ST_Distance(
+                    func.Geography(models.Building.location),
+                    func.Geography(point),
+                )
+            )
+            .all()
         )
-        .all()
-    )
-    return organizations
+    except Exception as e:
+        print(f"Error in get_organizations_by_coordinates: {e}")
+        return []
 
 
 def get_organizations_by_name(
@@ -115,7 +225,6 @@ def get_organizations_by_name(
 
 
 def get_organizations_by_activity(db: Session, activity_name: str):
-    # Получаем активность по имени
     activity = (
         db.query(models.Activity)
         .filter(models.Activity.name.ilike(f"%{activity_name}%"))
@@ -125,7 +234,6 @@ def get_organizations_by_activity(db: Session, activity_name: str):
     if not activity:
         return []
 
-    # Получаем все дочерние активности (до 3 уровня)
     child_activities = set()
 
     def add_children(parent_id, level=0):
@@ -143,7 +251,6 @@ def get_organizations_by_activity(db: Session, activity_name: str):
     child_activities.add(activity.id)
     add_children(activity.id)
 
-    # Получаем все организации с найденными активностями
     return (
         db.query(models.Organization)
         .filter(
